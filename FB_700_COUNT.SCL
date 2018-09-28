@@ -1,0 +1,123 @@
+FUNCTION_BLOCK FB_Count // FB700
+// Last update UTC+8-2018-08-15-08-51
+TITLE   = 'Version 1.2.01'
+VERSION : '1.2'
+AUTHOR  : WuTong
+NAME    : COUNT
+FAMILY  : COUNT
+
+// Block Input Parameters
+VAR_INPUT
+    Typ1_FM:BOOL;// Typ1 FM Signal
+    Typ2_FM:BOOL;// Typ2 FM Signal
+    Typ3_FM:BOOL;// Typ3 FM Signal
+    Typ4_FM:BOOL;// Typ4 FM Signal
+    Typ5_FM:BOOL;// Typ5 FM Signal
+    Typ6_FM:BOOL;// Typ6 FM Signal
+    Typ7_FM:BOOL;// Typ7 FM Signal
+    Typ8_FM:BOOL;// Typ8 FM Signal
+    Typ1_BMK:STRING[15];// Typ1 Text
+    Typ2_BMK:STRING[15];// Typ2 Text
+    Typ3_BMK:STRING[15];// Typ3 Text
+    Typ4_BMK:STRING[15];// Typ4 Text
+    Typ5_BMK:STRING[15];// Typ5 Text
+    Typ6_BMK:STRING[15];// Typ6 Text
+    Typ7_BMK:STRING[15];// Typ7 Text
+    Typ8_BMK:STRING[15];// Typ8 Text
+    table:TimeTable;// Time Table
+    SWE7:BOOL := FALSE;// SWE7 E7 Key Signal
+    Type_Mask:BYTE;// Type Mask
+    mask AT Type_Mask : ARRAY[1..8] OF BOOL;
+END_VAR
+
+VAR_TEMP
+    i:INT;
+    j:INT;
+    dateNow:DATE_AND_TIME;
+    t_start:TIME_OF_DAY;
+    t_end:TIME_OF_DAY;
+    t_reset:TIME_OF_DAY;
+    d_start AT t_start : DINT;
+    d_end AT t_end : DINT;
+    d_reset AT t_reset : DINT;
+END_VAR
+
+VAR
+    Reset: BOOL;// HMI reset button signal
+    Counts:ARRAY[1..8,1..12]OF INT;// counts
+    timeNow:TIME_OF_DAY;// time of now
+    d_now AT timeNow : DINT;
+    TypFM1: R_TRIG;//postive edge signal
+    TypFM2: R_TRIG;//postive edge signal
+    TypFM3: R_TRIG;//postive edge signal
+    TypFM4: R_TRIG;//postive edge signal
+    TypFM5: R_TRIG;//postive edge signal
+    TypFM6: R_TRIG;//postive edge signal
+    TypFM7: R_TRIG;//postive edge signal
+    TypFM8: R_TRIG;//postive edge signal
+END_VAR
+
+// Get System Clock
+i := READ_CLK(CDT := dateNow );
+timeNow := DT_TOD(IN := dateNow );
+
+// Reset
+t_reset := table.reset;
+// if (t_reset - 50 < t_now < t_reset + 50) // 50 > plc max OB1 cycle time
+IF ((d_reset - 50 < d_now AND d_now < d_reset + 50) OR (Reset AND SWE7)) THEN
+    FOR i:= 1 TO 8 DO
+        FOR j:= 1 TO 12 DO
+             Counts[i,j] := 0;
+        END_FOR;
+    END_FOR;
+END_IF;
+
+// postive edge of Typx_FM
+TypFM1(CLK:=Typ1_FM);
+TypFM2(CLK:=Typ2_FM);
+TypFM3(CLK:=Typ3_FM);
+TypFM4(CLK:=Typ4_FM);
+TypFM5(CLK:=Typ5_FM);
+TypFM6(CLK:=Typ6_FM);
+TypFM7(CLK:=Typ7_FM);
+TypFM8(CLK:=Typ8_FM);
+
+// check time table
+FOR i := 1 TO 12 DO
+    t_start := table.period[i].start;
+    t_end := table.period[i].end;
+    
+    // if(t_start <= t_now && t_now <= t_end){
+    //     if(typ1.Q) Counts[1][i]++;
+    //     else if(typ2.Q) Counts[2][i]++;
+    //     .....
+    //     else if(typ8.Q) Counts[8][i]++;
+    // }else if(start > end && (start <= now || now <= end)){
+    //     if(typ1.Q) Counts[1][i]++;
+    //     else if(typ2.Q) Counts[2][i]++;
+    //     .....
+    //     else if(typ8.Q) Counts[8][i]++;
+    // }
+    
+    IF ((d_start <= d_now AND d_now <= d_end) OR (d_start > d_end AND (d_start <= d_now OR d_now <= d_end))) THEN
+        IF (TypFM1.Q AND mask[1]) THEN
+            Counts[1,i] := Counts[1,i] + 1;
+        ELSIF (TypFM2.Q AND mask[2]) THEN
+            Counts[2,i] := Counts[2,i] + 1;
+        ELSIF (TypFM3.Q AND mask[3]) THEN
+            Counts[3,i] := Counts[3,i] + 1;
+        ELSIF (TypFM4.Q AND mask[4]) THEN
+            Counts[4,i] := Counts[4,i] + 1;
+        ELSIF (TypFM5.Q AND mask[5]) THEN
+            Counts[5,i] := Counts[5,i] + 1;
+        ELSIF (TypFM6.Q AND mask[6]) THEN
+            Counts[6,i] := Counts[6,i] + 1;
+        ELSIF (TypFM7.Q AND mask[7]) THEN
+            Counts[7,i] := Counts[7,i] + 1;
+        ELSIF (TypFM8.Q AND mask[8]) THEN
+            Counts[8,i] := Counts[8,i] + 1;
+        END_IF;
+    END_IF;
+END_FOR;
+
+END_FUNCTION_BLOCK
