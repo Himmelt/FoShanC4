@@ -1,0 +1,15 @@
+TYPE "TimeTable"
+TITLE   = 'TimeTable'
+VERSION : 1.0
+AUTHOR  : WuTong
+NAME    : TABLE
+FAMILY  : COUNT
+  STRUCT 	
+   period : ARRAY  [1 .. 12 ] OF //period
+   STRUCT 	
+    start : TIME_OF_DAY ;	//period start time
+    end : TIME_OF_DAY ;	//period end time
+   END_STRUCT ;	
+   reset : TIME_OF_DAY ;	//reset time
+  END_STRUCT ;	
+END_TYPE
