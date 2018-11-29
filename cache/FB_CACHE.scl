@@ -1,0 +1,110 @@
+FUNCTION_BLOCK FB_CACHE
+// Last update UTC+8-2018-11-28-08-44
+TITLE   = 'Version 1.0.00'
+VERSION : '1.0'
+AUTHOR  : WuTong
+NAME    : CACHE
+FAMILY  : CACHE
+
+// Block Input Parameters
+VAR_INPUT
+    Typ1 : BOOL;
+    BlockSize1 : INT;
+    Typ2 : BOOL;
+    BlockSize2 : INT;
+    Typ3 : BOOL;
+    BlockSize3 : INT;
+    Typ4 : BOOL;
+    BlockSize4 : INT;
+    
+    FM_Data_Input : BOOL;
+    PopAll : BOOL;
+END_VAR
+
+VAR_TEMP
+    BlockSize : ARRAY[1..4] OF INT;
+    TypPos : ARRAY[1..4] OF BOOL;
+    TypOut : ARRAY[1..4] OF BOOL;
+    FlagG : BOOL;
+    i : INT;
+END_VAR
+
+VAR_OUTPUT
+    Cache1 : INT := 0;
+    Typ1Out : BOOL := false;
+    Cache2 : INT := 0;
+    Typ2Out : BOOL := false;
+    Cache3 : INT := 0;
+    Typ3Out : BOOL := false;
+    Cache4 : INT := 0;
+    Typ4Out : BOOL := false;
+    
+    DataEmpty : BOOL;
+END_VAR
+
+VAR
+    Cache : ARRAY[1..4] OF INT;
+    Flag : ARRAY[1..4] OF BOOL;
+    Typ1Pos: R_TRIG;//postive edge signal
+    Typ2Pos: R_TRIG;//postive edge signal
+    Typ3Pos: R_TRIG;//postive edge signal
+    Typ4Pos: R_TRIG;//postive edge signal
+    SuccessPos : R_TRIG;//postive edge signal
+END_VAR
+
+
+Typ1Pos(CLK := Typ1);
+Typ2Pos(CLK := Typ2);
+Typ3Pos(CLK := Typ3);
+Typ4Pos(CLK := Typ4);
+SuccessPos(CLK := FM_Data_Input);
+TypPos[1] := Typ1Pos.Q;
+TypPos[2] := Typ2Pos.Q;
+TypPos[3] := Typ3Pos.Q;
+TypPos[4] := Typ4Pos.Q;
+
+BlockSize[1] := BlockSize1;
+BlockSize[2] := BlockSize2;
+BlockSize[3] := BlockSize3;
+BlockSize[4] := BlockSize4;
+
+FlagG :=  Flag[1] OR Flag[2] OR Flag[3] OR Flag[4];
+
+FOR i := 1 TO 4 DO
+    IF TypPos[i] THEN
+        Cache[i] := Cache[i] + 1;
+    END_IF;
+    IF Cache[i] >= 1 AND ( PopAll OR NOT FlagG AND Cache[i] >= BlockSize[i] ) THEN
+        Flag[i] := true;
+    END_IF;
+END_FOR;
+
+Flag[2] := Flag[2] AND NOT Flag[1];
+Flag[3] := Flag[3] AND NOT Flag[1] AND NOT Flag[2];
+Flag[4] := Flag[4] AND NOT Flag[1] AND NOT Flag[2] AND NOT Flag[3];
+
+FOR i := 1 TO 4 DO
+    IF Flag[i] THEN
+        TypOut[i] := true;
+        IF SuccessPos.Q THEN
+            TypOut[i] := false;
+            Cache[i] := Cache[i] - 1;
+        END_IF;
+    END_IF;
+    
+    IF Cache[i] <= 0 THEN
+        Flag[i] := False;
+    END_IF;
+END_FOR;
+
+Typ1Out := TypOut[1];
+Typ2Out := TypOut[2];
+Typ3Out := TypOut[3];
+Typ4Out := TypOut[4];
+Cache1 := Cache[1];
+Cache2 := Cache[2];
+Cache3 := Cache[3];
+Cache4 := Cache[4];
+DataEmpty :=  Cache1 + Cache2 + Cache3 + Cache4 <= 0;
+
+END_FUNCTION_BLOCK
