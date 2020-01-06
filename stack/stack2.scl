@@ -1,0 +1,103 @@
+
+FUNCTION_BLOCK FB1
+
+VAR_INPUT
+    RES_RFID : DINT;
+    RES_CODE : BYTE;
+    CODE1_1  : BYTE;
+    CODE1_2  : BYTE;
+    CODE1_3  : BYTE;
+    CODE1_4  : BYTE;
+    RFID_1   : DINT;
+    CODE2_1  : BYTE;
+    CODE2_2  : BYTE;
+    CODE2_3  : BYTE;
+    CODE2_4  : BYTE;
+    RFID_2   : DINT;
+END_VAR
+
+VAR
+    PEEK       : int := 0;
+    STACK_RFID : ARRAY[0..8] OF DINT;
+    STACK_CODE : ARRAY[0..8] OF BYTE;
+    TRACE_CODE : ARRAY[0..7] OF BYTE;
+END_VAR
+
+VAR_TEMP
+    TEMP_CODE : ARRAY[0..7] OF BYTE;
+    TEMP_RFID : ARRAY[0..1] OF DINT;
+    i : INT;
+    j : INT;
+END_VAR
+
+
+VAR_OUTPUT
+    SEND_RFID : DINT := 0;
+    SEND_CODE : BYTE := 0;
+END_VAR
+
+// INIT CODE & RFID
+TEMP_CODE[0] := CODE1_1;
+TEMP_CODE[1] := CODE1_2;
+TEMP_CODE[2] := CODE1_3;
+TEMP_CODE[3] := CODE1_4;
+
+TEMP_CODE[4] := CODE2_1;
+TEMP_CODE[5] := CODE2_2;
+TEMP_CODE[6] := CODE2_3;
+TEMP_CODE[7] := CODE2_4;
+
+TEMP_RFID[0] := RFID_1;
+TEMP_RFID[1] := RFID_2;
+
+STACK_RFID[8] := 0;
+STACK_CODE[8] := 0;
+
+// CHECK RESPONSE FROM ARG3
+IF RES_RFID = SEND_RFID AND RES_CODE = SEND_CODE THEN
+    SEND_RFID := 0;
+    SEND_CODE := 0;
+END_IF;
+
+// Ready for sending
+IF SEND_CODE = 0 THEN
+    IF STACK_CODE[0] <> 0 THEN
+        SEND_RFID := STACK_RFID[0];
+        SEND_CODE := STACK_CODE[0];
+    END_IF;
+    // POP Operation
+    IF PEEK > 0 THEN
+        FOR i := 0 TO (PEEK - 1) DO
+            STACK_RFID[i] := STACK_RFID[i + 1];
+            STACK_CODE[i] := STACK_CODE[i + 1];
+        END_FOR;
+        STACK_RFID[PEEK - 1] := 0;
+        STACK_CODE[PEEK - 1] := 0;
+        PEEK := PEEK - 1;
+    END_IF;
+END_IF;
+
+// PUSH Operation
+FOR i:= 0 TO 7 DO
+    IF TEMP_CODE[i] <> TRACE_CODE[i] THEN
+        TRACE_CODE[i] := TEMP_CODE[i];
+        IF TRACE_CODE[i] <> 0 THEN
+            //Need pop first then push
+            IF PEEK > 7 THEN
+                // PEEK == 8
+                // j from 0 to 7
+                FOR j := 0 TO (PEEK - 1) DO
+                    STACK_RFID[j] := STACK_RFID[j + 1];
+                    STACK_CODE[j] := STACK_CODE[j + 1];
+                END_FOR;
+                PEEK := PEEK - 1;// PEEK == 7
+            END_IF;
+            STACK_RFID[PEEK] := TEMP_RFID[i/4];
+            STACK_CODE[PEEK] := TRACE_CODE[i];
+            PEEK := PEEK + 1;
+        END_IF;
+    END_IF;
+END_FOR;
+
+END_FUNCTION_BLOCK
+
