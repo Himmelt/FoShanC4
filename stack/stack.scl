@@ -1,0 +1,173 @@
+FUNCTION_BLOCK FB700
+
+KNOW_HOW_PROTECT
+
+VAR_INPUT
+    RES_RFID : DINT;
+    RES_CODE : BYTE;
+
+    CODE1_1  : BYTE;
+    STOE1_1  : BOOL;
+    CODE1_2  : BYTE;
+    STOE1_2  : BOOL;
+    CODE1_3  : BYTE;
+    STOE1_3  : BOOL;
+    CODE1_4  : BYTE;
+    STOE1_4  : BOOL;
+    POSE1_1  : BOOL;
+    POSE1_2  : BOOL;
+    Read_1   : BOOL;  
+    UII_1    : ARRAY [1..30] OF BYTE;
+    
+    CODE2_1  : BYTE;
+    STOE2_1  : BOOL;
+    CODE2_2  : BYTE;
+    STOE2_2  : BOOL;
+    CODE2_3  : BYTE;
+    STOE2_3  : BOOL;
+    CODE2_4  : BYTE;
+    STOE2_4  : BOOL;
+    POSE2_1  : BOOL;
+    POSE2_2  : BOOL;
+    Read_2   : BOOL;
+    UII_2    : ARRAY [1..30] OF BYTE;
+END_VAR
+
+VAR
+    PEEK       : INT := 0;
+    READ_1_POS : R_TRIG;
+    READ_2_POS : R_TRIG;
+    RFID       : ARRAY[0..1,0..1] OF DINT;
+    STACK_RFID : ARRAY[0..8] OF DINT;
+    STACK_CODE : ARRAY[0..8] OF BYTE;
+    TRACE_CODE : ARRAY[0..7] OF BYTE;
+END_VAR
+
+VAR_TEMP
+    i : INT;
+    j : INT;
+    pos : BOOL;
+    TEMP_CODE : ARRAY[0..7] OF BYTE;
+    TEMP_STOE : ARRAY[0..7] OF BOOL;
+    TEMP_RFID : ARRAY[0..1] OF DINT;
+END_VAR
+
+VAR_OUTPUT
+    SEND_RFID : DINT := 0;
+    SEND_CODE : BYTE := 0;
+END_VAR
+
+// INIT CODE & STOE & RFID
+TEMP_CODE[0] := CODE1_1;
+TEMP_CODE[1] := CODE1_2;
+TEMP_CODE[2] := CODE1_3;
+TEMP_CODE[3] := CODE1_4;
+
+TEMP_STOE[0] := STOE1_1;
+TEMP_STOE[1] := STOE1_2;
+TEMP_STOE[2] := STOE1_3;
+TEMP_STOE[3] := STOE1_4;
+
+TEMP_CODE[4] := CODE2_1;
+TEMP_CODE[5] := CODE2_2;
+TEMP_CODE[6] := CODE2_3;
+TEMP_CODE[7] := CODE2_4;
+
+TEMP_STOE[4] := STOE2_1;
+TEMP_STOE[5] := STOE2_2;
+TEMP_STOE[6] := STOE2_3;
+TEMP_STOE[7] := STOE2_4;
+
+STACK_RFID[8] := 0;
+STACK_CODE[8] := 0;
+
+READ_1_POS(CLK:=Read_1);
+READ_2_POS(CLK:=Read_2);
+
+IF READ_1_POS.Q THEN
+    IF POSE1_1 THEN
+        RFID[0,0] := 0;
+        FOR i := 1 TO 8 DO
+            RFID[0,0] := RFID[0,0] * 10 + (BYTE_TO_INT(UII_1[i]) - 48);
+        END_FOR;
+    ELSIF POSE1_2 THEN
+        RFID[0,1] := 0;
+        FOR i := 1 TO 8 DO
+            RFID[0,1] := RFID[0,1] * 10 + (BYTE_TO_INT(UII_1[i]) - 48);
+        END_FOR;
+   END_IF;
+END_IF;
+
+IF READ_2_POS.Q THEN
+    IF POSE2_1 THEN
+        RFID[1,0] := 0;
+        FOR i := 1 TO 8 DO
+            RFID[1,0] := RFID[1,0] * 10 + (BYTE_TO_INT(UII_1[i]) - 48);
+        END_FOR;
+    ELSIF POSE2_2 THEN
+        RFID[1,1] := 0;
+        FOR i := 1 TO 8 DO
+            RFID[1,1] := RFID[1,1] * 10 + (BYTE_TO_INT(UII_1[i]) - 48);
+        END_FOR;
+   END_IF;
+END_IF;
+
+IF POSE1_1 THEN
+    TEMP_RFID[0] := RFID[0,0];
+ELSIF POSE1_2 THEN
+    TEMP_RFID[0] := RFID[0,1];
+END_IF;
+
+IF POSE2_1 THEN
+    TEMP_RFID[1] := RFID[1,0];
+ELSIF POSE2_2 THEN
+    TEMP_RFID[1] := RFID[1,1];
+END_IF;
+
+// CHECK RESPONSE FROM ARG3
+IF RES_RFID = SEND_RFID AND RES_CODE = SEND_CODE THEN
+    SEND_RFID := 0;
+    SEND_CODE := 0;
+END_IF;
+
+// Ready for sending
+IF SEND_CODE = 0 THEN
+    IF STACK_CODE[0] <> 0 THEN
+        SEND_RFID := STACK_RFID[0];
+        SEND_CODE := STACK_CODE[0];
+    END_IF;
+    // POP Operation
+    IF PEEK > 0 THEN
+        FOR i := 0 TO (PEEK - 1) DO
+            STACK_RFID[i] := STACK_RFID[i + 1];
+            STACK_CODE[i] := STACK_CODE[i + 1];
+        END_FOR;
+        STACK_RFID[PEEK - 1] := 0;
+        STACK_CODE[PEEK - 1] := 0;
+        PEEK := PEEK - 1;
+    END_IF;
+END_IF;
+
+// PUSH Operation
+FOR i:= 0 TO 7 DO
+    IF TEMP_STOE[i] AND TEMP_CODE[i] <> TRACE_CODE[i] THEN
+        TRACE_CODE[i] := TEMP_CODE[i];
+        IF TRACE_CODE[i] <> 0 THEN
+            //Need pop first then push
+            IF PEEK > 7 THEN
+                // PEEK == 8
+                // j from 0 to 7
+                FOR j := 0 TO (PEEK - 1) DO
+                    STACK_RFID[j] := STACK_RFID[j + 1];
+                    STACK_CODE[j] := STACK_CODE[j + 1];
+                END_FOR;
+                PEEK := PEEK - 1;// PEEK == 7
+            END_IF;
+            STACK_RFID[PEEK] := TEMP_RFID[i/4];
+            STACK_CODE[PEEK] := TRACE_CODE[i];
+            PEEK := PEEK + 1;
+        END_IF;
+    END_IF;
+END_FOR;
+
+END_FUNCTION_BLOCK
