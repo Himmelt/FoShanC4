@@ -1,0 +1,100 @@
+FUNCTION_BLOCK FB_StackQueue// FB800
+
+TITLE = 'StackQueue'
+VERSION: '1.0'
+KNOW_HOW_PROTECT
+AUTHOR: WuTong
+NAME: QUEUE
+FAMILY: STACK
+
+VAR_INPUT
+    In    : BYTE := 0;
+    Out   : BYTE := 0;
+    Push  : BOOL := false;
+    Pop   : BOOL := false;
+    Frg   : BOOL := false;
+    Auth  : BOOL := false;
+END_VAR
+
+VAR_OUTPUT
+    Store : INT  := 0;
+END_VAR
+
+VAR_TEMP
+    i : INT;
+END_VAR
+
+VAR
+    stack : ARRAY[0..5] OF BYTE;
+    Reset : BOOL := false;
+    Authorization : BOOL := false;
+    seek  : INT := 0;
+    Push_TRIG: R_TRIG;
+    Pop_TRIG: R_TRIG;
+END_VAR
+
+Authorization := Auth;
+IF Reset AND Auth THEN
+    stack[1] := 0;
+    stack[2] := 0;
+    stack[3] := 0;
+    stack[4] := 0;
+    Store := 0;
+    seek := 4;
+    RETURN;
+END_IF;
+
+Push_TRIG(CLK:=Push);
+Pop_TRIG(CLK:=Pop);
+
+stack[0] := In;
+
+IF Frg THEN
+    stack[5] := Out;
+END_IF;
+
+IF Pop_TRIG.Q THEN
+    stack[4] := stack[3];
+    stack[3] := stack[2];
+    stack[2] := stack[1];
+    stack[1] := 0;
+    IF seek < 4 THEN
+        seek := seek + 1;
+    END_IF;
+END_IF;
+
+IF Push_TRIG.Q THEN
+    IF seek >=1 AND seek <= 4 THEN
+        stack[seek] := In;
+    END_IF;
+    IF seek > 1 THEN
+        seek := seek - 1;
+    END_IF;
+END_IF;
+
+IF Push THEN
+    stack[0] := 0;
+END_IF;
+
+IF Pop THEN
+    stack[5] := 0;
+END_IF;
+
+Store := 0;
+
+FOR i := 0 TO 5 DO
+    IF (stack[i] & 2#1) = 2#1 THEN
+        Store := Store + 1;
+    END_IF;
+    IF (stack[i] & 2#10) = 2#10 THEN
+        Store := Store + 1;
+    END_IF;
+    IF (stack[i] & 2#100) = 2#100 THEN
+        Store := Store + 1;
+    END_IF;
+    IF (stack[i] & 2#1000) = 2#1000 THEN
+        Store := Store + 1;
+    END_IF;
+END_FOR;
+
+END_FUNCTION_BLOCK
